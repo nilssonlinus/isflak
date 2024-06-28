@@ -43,8 +43,6 @@ VkInstance ik_create_instance(ik_instance_info *info,
 
 VkPhysicalDevice ik_choose_physical_device(ik_physical_device_info *info);
 
-VkDevice ik_create_device();
-
 #ifdef ISFLAK_IMPLEMENTATION
 
 #include <stdio.h>
@@ -52,21 +50,21 @@ VkDevice ik_create_device();
 #include <assert.h>
 #include <string.h>
 
-#define _IK_ASSERT_EQ(value, success_state, message)                           \
+#define IK__ASSERT_EQ(value, success_state, message)                           \
     assert(value == success_state && "[ISFLAK]" message);                      \
     if (value != success_state)                                                \
         fprintf(stderr, "[ISFLAK] Assertion" message "failed. \n");
 
-#define _IK_ASSERT_NEQ(value, fail_state, message)                             \
+#define IK__ASSERT_NEQ(value, fail_state, message)                             \
     assert(value != fail_state && "[ISFLAK]" message);                         \
     if (value == fail_state)                                                   \
         fprintf(stderr, "[ISFLAK] Assertion" message "failed. \n");
 
-#define _IK_VK_CHECK(result, message) _IK_ASSERT_EQ(result, VK_SUCCESS, message)
+#define IK__VK_CHECK(result, message) IK__ASSERT_EQ(result, VK_SUCCESS, message)
 
 #ifndef IK_CUSTOM_DEBUG_CALLBACK
 static VKAPI_ATTR VkBool32 VKAPI_CALL
-_IK_DEBUG_CALLBACK(VkDebugUtilsMessageSeverityFlagBitsEXT message_severity,
+IK__DEBUG_CALLBACK(VkDebugUtilsMessageSeverityFlagBitsEXT message_severity,
                    VkDebugUtilsMessageTypeFlagsEXT message_type,
                    const VkDebugUtilsMessengerCallbackDataEXT *p_callback_data,
                    void *p_user_data) {
@@ -90,12 +88,11 @@ VkInstance ik_create_instance(ik_instance_info *info,
     VkInstanceCreateInfo instance_create_info = {
         .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
         .pNext = NULL,
-        .flags = NULL,
         .pApplicationInfo = &app_info,
         .enabledLayerCount = 0,
         .ppEnabledLayerNames = NULL,
         .enabledExtensionCount = info->extension_count,
-        .ppEnabledExtensionNames = info->extension_names,
+        .ppEnabledExtensionNames = (const char **)info->extension_names,
     };
 
     VkDebugUtilsMessengerCreateInfoEXT debug_messenger_create_info = {
@@ -106,27 +103,34 @@ VkInstance ik_create_instance(ik_instance_info *info,
         .messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
                        VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
                        VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT,
-        .pfnUserCallback = &_IK_DEBUG_CALLBACK,
+        .pfnUserCallback = &IK__DEBUG_CALLBACK,
     };
 
     if (info->enable_validation_layers == VK_TRUE) {
-        char **extensions = info->extension_names;
+        char **extensions;
+        if (info->extension_names != NULL) {
+            extensions = info->extension_names;
+        } else {
+            extensions = malloc(sizeof(char *));
+        }
         extensions[info->extension_count] = VK_EXT_DEBUG_UTILS_EXTENSION_NAME;
-        instance_create_info.ppEnabledLayerNames = info->validation_layer_names;
+        instance_create_info.ppEnabledLayerNames =
+            (const char **)info->validation_layer_names;
         instance_create_info.enabledLayerCount = info->validation_layer_count;
         instance_create_info.pNext =
             (VkDebugUtilsMessengerCreateInfoEXT *)&debug_messenger_create_info;
-        instance_create_info.ppEnabledExtensionNames = extensions;
+        instance_create_info.ppEnabledExtensionNames =
+            (const char **)extensions;
         instance_create_info.enabledExtensionCount = info->extension_count + 1;
     }
 
     VkInstance instance;
-    _IK_VK_CHECK(vkCreateInstance(&instance_create_info, NULL, &instance),
+    IK__VK_CHECK(vkCreateInstance(&instance_create_info, NULL, &instance),
                  "Instance creation");
 
     if (info->enable_validation_layers == VK_TRUE) {
         IK_LOAD_PFN(instance, vkCreateDebugUtilsMessengerEXT);
-        _IK_VK_CHECK(
+        IK__VK_CHECK(
             IK_PFN_vkCreateDebugUtilsMessengerEXT(
                 instance, &debug_messenger_create_info, NULL, debug_messenger),
             "Debug messenger creation")
@@ -138,7 +142,7 @@ VkInstance ik_create_instance(ik_instance_info *info,
 VkPhysicalDevice ik_choose_physical_device(ik_physical_device_info *info) {
     uint32_t device_count = 0;
     vkEnumeratePhysicalDevices(info->instance, &device_count, NULL);
-    _IK_ASSERT_NEQ(device_count, 0, "Physical device count not zero");
+    IK__ASSERT_NEQ(device_count, 0, "Physical device count not zero");
 
     VkPhysicalDevice *devices =
         (VkPhysicalDevice *)malloc(sizeof(VkPhysicalDevice) * device_count);
@@ -197,7 +201,7 @@ VkPhysicalDevice ik_choose_physical_device(ik_physical_device_info *info) {
         }
     }
     free(devices);
-    _IK_ASSERT_NEQ(physical_device, NULL, "Physical device found");
+    IK__ASSERT_NEQ(physical_device, NULL, "Physical device found");
 
     return physical_device;
 }
