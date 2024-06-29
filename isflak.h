@@ -19,9 +19,9 @@ extern "C" {
         (void *)vkGetInstanceProcAddr(instance, #function_name);
 
 typedef struct ik_instance_info {
-    char **extension_names;
+    const char **extension_names;
     uint32_t extension_count;
-    char **validation_layer_names;
+    const char **validation_layer_names;
     uint32_t validation_layer_count;
     VkBool32 enable_validation_layers;
     char *application_name;
@@ -92,7 +92,7 @@ VkInstance ik_create_instance(ik_instance_info *info,
         .enabledLayerCount = 0,
         .ppEnabledLayerNames = NULL,
         .enabledExtensionCount = info->extension_count,
-        .ppEnabledExtensionNames = (const char **)info->extension_names,
+        .ppEnabledExtensionNames = info->extension_names,
     };
 
     VkDebugUtilsMessengerCreateInfoEXT debug_messenger_create_info = {
@@ -107,15 +107,19 @@ VkInstance ik_create_instance(ik_instance_info *info,
     };
 
     if (info->enable_validation_layers == VK_TRUE) {
-        char **extensions;
+        char **extensions = (char **)malloc(sizeof(char *));
         if (info->extension_names != NULL) {
-            extensions = info->extension_names;
-        } else {
-            extensions = malloc(sizeof(char *));
+            extensions =
+                (char **)malloc(sizeof(char *) * (info->extension_count + 1));
+            for (uint32_t extension = 0; extension < info->extension_count;
+                 extension++) {
+                extensions[extension] =
+                    (char *)info->extension_names[extension];
+            }
         }
         extensions[info->extension_count] = VK_EXT_DEBUG_UTILS_EXTENSION_NAME;
-        instance_create_info.ppEnabledLayerNames =
-            (const char **)info->validation_layer_names;
+
+        instance_create_info.ppEnabledLayerNames = info->validation_layer_names;
         instance_create_info.enabledLayerCount = info->validation_layer_count;
         instance_create_info.pNext =
             (VkDebugUtilsMessengerCreateInfoEXT *)&debug_messenger_create_info;
@@ -126,14 +130,14 @@ VkInstance ik_create_instance(ik_instance_info *info,
 
     VkInstance instance;
     IK__VK_CHECK(vkCreateInstance(&instance_create_info, NULL, &instance),
-                 "Instance creation");
+                 "Instance creation failed");
 
     if (info->enable_validation_layers == VK_TRUE) {
         IK_LOAD_PFN(instance, vkCreateDebugUtilsMessengerEXT);
         IK__VK_CHECK(
             IK_PFN_vkCreateDebugUtilsMessengerEXT(
                 instance, &debug_messenger_create_info, NULL, debug_messenger),
-            "Debug messenger creation")
+            "Debug messenger creation failed");
     }
 
     return instance;
@@ -142,7 +146,7 @@ VkInstance ik_create_instance(ik_instance_info *info,
 VkPhysicalDevice ik_choose_physical_device(ik_physical_device_info *info) {
     uint32_t device_count = 0;
     vkEnumeratePhysicalDevices(info->instance, &device_count, NULL);
-    IK__ASSERT_NEQ(device_count, 0, "Physical device count not zero");
+    IK__ASSERT_NEQ(device_count, 0, "Physical device count is zero");
 
     VkPhysicalDevice *devices =
         (VkPhysicalDevice *)malloc(sizeof(VkPhysicalDevice) * device_count);
@@ -154,7 +158,7 @@ VkPhysicalDevice ik_choose_physical_device(ik_physical_device_info *info) {
          current_device++) {
         VkBool32 surface_support;
         uint32_t queue_family_count;
-        vkGetPhysicalDeviceQueueFamilyProperties(physical_device,
+        vkGetPhysicalDeviceQueueFamilyProperties(devices[current_device],
                                                  &queue_family_count, NULL);
         for (uint32_t queue_family_index = 0;
              queue_family_index < queue_family_count; queue_family_count++) {
@@ -174,8 +178,9 @@ VkPhysicalDevice ik_choose_physical_device(ik_physical_device_info *info) {
         VkExtensionProperties *available_extensions =
             (VkExtensionProperties *)malloc(sizeof(VkExtensionProperties) *
                                             extension_count);
-        vkEnumerateDeviceExtensionProperties(
-            physical_device, NULL, &extension_count, available_extensions);
+        vkEnumerateDeviceExtensionProperties(devices[current_device], NULL,
+                                             &extension_count,
+                                             available_extensions);
 
         uint32_t supported_extension_count = 0;
         for (uint32_t available_extension = 0;
@@ -201,7 +206,7 @@ VkPhysicalDevice ik_choose_physical_device(ik_physical_device_info *info) {
         }
     }
     free(devices);
-    IK__ASSERT_NEQ(physical_device, NULL, "Physical device found");
+    IK__ASSERT_NEQ(physical_device, NULL, "Physical device not found");
 
     return physical_device;
 }
