@@ -43,7 +43,6 @@ VkInstance ik_create_instance(ik_instance_info *info,
 
 VkPhysicalDevice ik_choose_physical_device(ik_physical_device_info *info);
 
-#define ISFLAK_IMPLEMENTATION
 #ifdef ISFLAK_IMPLEMENTATION
 
 #include <stdio.h>
