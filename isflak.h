@@ -43,6 +43,7 @@ VkInstance ik_create_instance(ik_instance_info *info,
 
 VkPhysicalDevice ik_choose_physical_device(ik_physical_device_info *info);
 
+#define ISFLAK_IMPLEMENTATION
 #ifdef ISFLAK_IMPLEMENTATION
 
 #include <stdio.h>
@@ -111,11 +112,8 @@ VkInstance ik_create_instance(ik_instance_info *info,
         if (info->extension_names != NULL) {
             extensions =
                 (char **)malloc(sizeof(char *) * (info->extension_count + 1));
-            for (uint32_t extension = 0; extension < info->extension_count;
-                 extension++) {
-                extensions[extension] =
-                    (char *)info->extension_names[extension];
-            }
+            memcpy(extensions, info->extension_names,
+                   sizeof(char *) * info->extension_count);
         }
         extensions[info->extension_count] = VK_EXT_DEBUG_UTILS_EXTENSION_NAME;
 
